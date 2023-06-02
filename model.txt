@@ -1,0 +1,45 @@
+byte capability;
+byte owner;
+byte nr_cs;
+
+proctype nginx() {
+    do
+        :: capability == 1 ->
+            /* Правило для возможности изменения прав доступа */
+            skip;
+        :: owner == 1 && (nr_cs == "/usr/sbin/nginx"  nr_cs == "/usr/sbin/nginx mr") ->
+            /* Правила для чтения и записи в логи */
+            if
+            :: (nr_cs == "/var/log/nginx/access.log" && nr_mode == 2) 
+               (nr_cs == "/var/log/nginx/error.log" && nr_mode == 2) -> skip;
+            fi;
+        :: owner == 1 && nr_cs == "/var/www/html/*" && nr_mode == 0 ->
+            /* Правило для чтения файлов в директории /var/www/html/ */
+            skip;
+        :: owner == 1 && (nr_cs == "/etc/nginx/*" 
+                          nr_cs == "/etc/nginx/conf.d/" 
+                          nr_cs == "/etc/nginx/modules-enabled/" 
+                          nr_cs == "/etc/nginx/sites-available/*" 
+                          nr_cs == "/etc/nginx/sites-enabled/*" 
+                          nr_cs == "/usr/share/nginx/modules-available/*") && nr_mode == 0 ->
+            /* Правила для чтения файлов в указанных директориях */
+            skip;
+        :: owner == 1 && nr_cs == "/proc/sys/kernel/random/boot_id" && nr_mode == 0 ->
+            /* Правило для чтения файла /proc/sys/kernel/random/boot_id */
+            skip;
+        :: owner == 1 && nr_cs == "/run/nginx.pid" && (nr_mode == 0  nr_mode == 1) ->
+            /* Правило для чтения и записи файла /run/nginx.pid */
+            skip;
+        :: else ->
+            /* Неизвестное правило */
+            printf("Unknown rule\n");
+    od;
+}
+
+init {
+    atomic {
+        capability = 0;
+        owner = 0;
+    }
+    run nginx();
+}
